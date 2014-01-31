@@ -13,16 +13,6 @@
  */
 package io.selendroid.server.model;
 
-import android.app.Activity;
-import android.content.res.Resources.Theme;
-import android.content.res.TypedArray;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Point;
-import android.graphics.drawable.Drawable;
-import android.view.Display;
-import android.view.View;
-import android.webkit.WebView;
 import io.selendroid.ServerInstrumentation;
 import io.selendroid.android.AndroidTouchScreen;
 import io.selendroid.android.AndroidWait;
@@ -45,13 +35,12 @@ import io.selendroid.server.model.internal.execute_native.NativeExecuteScript;
 import io.selendroid.server.model.js.AndroidAtoms;
 import io.selendroid.util.Preconditions;
 import io.selendroid.util.SelendroidLogger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -61,6 +50,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import android.app.Activity;
+import android.content.res.Resources.Theme;
+import android.content.res.TypedArray;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Point;
+import android.graphics.drawable.Drawable;
+import android.os.Environment;
+import android.view.Display;
+import android.view.View;
+import android.webkit.WebView;
+import dalvik.system.DexClassLoader;
 
 
 public class DefaultSelendroidDriver implements SelendroidDriver {
@@ -91,7 +97,9 @@ public class DefaultSelendroidDriver implements SelendroidDriver {
   public DefaultSelendroidDriver(ServerInstrumentation instrumentation) {
     serverInstrumentation = instrumentation;
     keySender = new InstrumentedKeySender(serverInstrumentation);
-    touch = new AndroidTouchScreen(serverInstrumentation, new InstrumentedMotionSender(serverInstrumentation));
+    touch =
+        new AndroidTouchScreen(serverInstrumentation, new InstrumentedMotionSender(
+            serverInstrumentation));
   }
 
   /*
@@ -519,6 +527,32 @@ public class DefaultSelendroidDriver implements SelendroidDriver {
     if (isNativeWindowMode()) {
       if (nativeExecuteScriptMap.containsKey(script)) {
         return nativeExecuteScriptMap.get(script).executeScript(args);
+      } else {
+        try {
+          String[] parameters = null;
+          if (args != null && args.length() >= 1) {
+            parameters = new String[args.length()];
+            for (int i = 0; i < args.length(); i++) {
+              parameters[i] = args.getString(i);
+            }
+          }
+          String dexFile = "/extension.jar";
+          File f = new File(Environment.getExternalStorageDirectory().toString() + dexFile);
+          final File optimizedDexOutputPath =
+              serverInstrumentation.getCurrentActivity().getDir("outdex", 0);
+          DexClassLoader classLoader =
+              new DexClassLoader(f.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(),
+                  null, serverInstrumentation.getCurrentActivity().getClassLoader());
+
+          String methodToInvoke = "executeScript";
+
+          Class<?> myClass = classLoader.loadClass(script);
+          Object obj = (Object) myClass.newInstance();
+          Method m = myClass.getMethod(methodToInvoke, ServerInstrumentation.class, String[].class);
+          return m.invoke(obj, serverInstrumentation, parameters);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
       }
       throw new UnsupportedOperationException(
           "Executing arbitrary script is only available in web views.");
@@ -683,8 +717,7 @@ public class DefaultSelendroidDriver implements SelendroidDriver {
     activeWindowType = WindowType.NATIVE_APP.name();
     try {
       return findElement(by);
-    } catch (NoSuchElementException nse) {
-    } finally {
+    } catch (NoSuchElementException nse) {} finally {
       serverInstrumentation.getAndroidWait().setTimeoutInMillis(previousTimeout);
       activeWindowType = previousActiveWindow;
     }
