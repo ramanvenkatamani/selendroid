@@ -412,6 +412,22 @@ public class DefaultAndroidEmulator extends AbstractDevice implements AndroidEmu
   }
 
   private void allAppsGridView() throws AndroidDeviceException {
+    if(screenSize.contains("HVGA")
+      screensize="320x480";
+    else if(screenSize.contains("QVGA")
+      screensize="240X320";
+    else if(screenSize.contains("WQVGA400")
+      screensize="240x400";
+    else if(screenSize.contains("WQVGA432")
+      screensize="240x432";
+    else if(screenSize.contains("WVGA800")
+      screensize="480x800";
+    else if(screenSize.contains("WVGA854")
+      screensize="480x854";
+    else if(screenSize.contains("WXGA")
+      screensize="1280x800";
+    else if(screenSize.contains("HVGA")
+      screensize="320x480";  
     String[] dimensions = screenSize.split("x");
     int x = Integer.parseInt(dimensions[0]);
     int y = Integer.parseInt(dimensions[1]);
